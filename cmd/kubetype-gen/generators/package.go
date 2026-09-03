@@ -17,19 +17,20 @@ package generators
 import (
 	"fmt"
 
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/types"
 
 	"istio.io/tools/cmd/kubetype-gen/metadata"
 )
 
 // NewPackageGenerator generates source for a scanned package, specifically k8s styled doc.go, types.go and register.go files
-func NewPackageGenerator(source metadata.PackageMetadata, boilerplate []byte) generator.Package {
-	return &generator.DefaultPackage{
-		PackageName: source.TargetPackage().Name,
-		PackagePath: source.TargetPackage().Path,
-		HeaderText:  boilerplate,
-		PackageDocumentation: []byte(fmt.Sprintf(`
+func NewPackageGenerator(source metadata.PackageMetadata, boilerplate []byte) generator.Target {
+	return &generator.SimpleTarget{
+		PkgName:       source.TargetPackage().Name,
+		PkgPath:       source.TargetPackage().Path,
+		PkgDir:        source.TargetPackage().Dir,
+		HeaderComment: boilerplate,
+		PkgDocComment: []byte(fmt.Sprintf(`
 // Package has auto-generated kube type wrappers for raw types.
 // +k8s:openapi-gen=true
 // +k8s:deepcopy-gen=package
@@ -43,14 +44,14 @@ func NewPackageGenerator(source metadata.PackageMetadata, boilerplate []byte) ge
 			}
 			return false
 		},
-		GeneratorList: []generator.Generator{
-			// generate types.go
-			NewTypesGenerator(source),
-			// generate register.go
-			NewRegisterGenerator(source),
-			generator.DefaultGen{
-				OptionalName: "doc",
-			},
+		GeneratorsFunc: func(c *generator.Context) []generator.Generator {
+			return []generator.Generator{
+				// generate types.go
+				NewTypesGenerator(source),
+				// generate register.go
+				NewRegisterGenerator(source),
+				generator.GoGenerator{OutputFilename: "doc.go"},
+			}
 		},
 	}
 }

@@ -19,15 +19,15 @@ import (
 	"slices"
 	"strings"
 
-	"k8s.io/gengo/generator"
-	"k8s.io/gengo/namer"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/generator"
+	"k8s.io/gengo/v2/namer"
+	"k8s.io/gengo/v2/types"
 
 	"istio.io/tools/cmd/kubetype-gen/metadata"
 )
 
 type typesGenerator struct {
-	generator.DefaultGen
+	generator.GoGenerator
 	source  metadata.PackageMetadata
 	imports namer.ImportTracker
 }
@@ -35,11 +35,11 @@ type typesGenerator struct {
 // NewTypesGenerator creates a new generator for creating k8s style types.go files
 func NewTypesGenerator(source metadata.PackageMetadata) generator.Generator {
 	return &typesGenerator{
-		DefaultGen: generator.DefaultGen{
-			OptionalName: "types",
+		GoGenerator: generator.GoGenerator{
+			OutputFilename: "types.go",
 		},
 		source:  source,
-		imports: generator.NewImportTracker(),
+		imports: generator.NewImportTrackerForPackage(source.TargetPackage().Path),
 	}
 }
 

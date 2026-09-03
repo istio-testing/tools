@@ -20,9 +20,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/golang/glog"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/gengo/types"
+	"k8s.io/gengo/v2/types"
+	"k8s.io/klog/v2"
 )
 
 // KubeType is the interface representing a type to be generated.
@@ -85,15 +85,19 @@ type packageMetadata struct {
 type metadataStore struct {
 	baseOutputPackage *types.Package
 	universe          *types.Universe
+	outputBase        string
+	trimPathPrefix    string
 	metadataForGV     map[string]PackageMetadata
 	metadata          []PackageMetadata
 }
 
 // NewMetadataStore returns a new store used for collecting source metadata used by the generator.
-func NewMetadataStore(baseOutputPackage *types.Package, universe *types.Universe) Store {
+func NewMetadataStore(baseOutputPackage *types.Package, universe *types.Universe, outputBase, trimPathPrefix string) Store {
 	return &metadataStore{
 		baseOutputPackage: baseOutputPackage,
 		universe:          universe,
+		outputBase:        outputBase,
+		trimPathPrefix:    trimPathPrefix,
 		metadataForGV:     map[string]PackageMetadata{},
 		metadata:          []PackageMetadata{},
 	}
@@ -103,7 +107,7 @@ func (s *metadataStore) MetadataForGV(gv *schema.GroupVersion) PackageMetadata {
 	simpleGV := schema.GroupVersion{Group: strings.SplitN(gv.Group, ".", 2)[0], Version: gv.Version}
 	existing := s.metadataForGV[simpleGV.String()]
 	if existing == nil {
-		glog.V(5).Infof("Creating new PackageMetadata for  Group/Version %s", gv)
+		klog.V(5).Infof("Creating new PackageMetadata for  Group/Version %s", gv)
 		existing = &packageMetadata{
 			groupVersion:        gv,
 			targetPackage:       s.createTargetPackage(gv),
@@ -114,7 +118,7 @@ func (s *metadataStore) MetadataForGV(gv *schema.GroupVersion) PackageMetadata {
 		s.metadataForGV[simpleGV.String()] = existing
 		s.metadata = append(s.metadata, existing)
 	} else if gv.Group != existing.GroupVersion().Group {
-		glog.Errorf("Overlapping packages for Group/Versions %s and %s", gv, existing.GroupVersion())
+		klog.Errorf("Overlapping packages for Group/Versions %s and %s", gv, existing.GroupVersion())
 		return nil
 	}
 	return existing
@@ -134,8 +138,15 @@ func (s *metadataStore) Validate() []error {
 
 func (s *metadataStore) createTargetPackage(gv *schema.GroupVersion) *types.Package {
 	groupPath := strings.SplitN(gv.Group, ".", 2)
-	targetPackage := s.universe.Package(filepath.Join(s.baseOutputPackage.Path, groupPath[0], gv.Version))
+	pkgPath := filepath.Join(s.baseOutputPackage.Path, groupPath[0], gv.Version)
+	targetPackage := s.universe.Package(pkgPath)
 	targetPackage.Name = gv.Version
+	dirPath := filepath.ToSlash(pkgPath)
+	if prefix := strings.TrimSuffix(filepath.ToSlash(s.trimPathPrefix), "/"); prefix != "" {
+		dirPath = strings.TrimPrefix(dirPath, prefix)
+		dirPath = strings.TrimPrefix(dirPath, "/")
+	}
+	targetPackage.Dir = filepath.Join(s.outputBase, filepath.FromSlash(dirPath))
 	return targetPackage
 }
 

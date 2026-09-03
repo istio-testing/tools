@@ -17,7 +17,7 @@ package generators
 import (
 	"strings"
 
-	"k8s.io/gengo/namer"
+	"k8s.io/gengo/v2/namer"
 )
 
 // NameSystems used by the kubetype generator

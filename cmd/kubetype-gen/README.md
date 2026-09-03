@@ -29,11 +29,13 @@ packages.
 
 The general command line usage:
 
-`${GOPATH}/bin/kubetype-gen -i <input-packages> -p <output-package>`
+`${GOPATH}/bin/kubetype-gen --input-dirs <input-packages> --output-package <output-package> -h <header-file>`
+
+Shorthand flags `-i`, `-p`, `-o`, and `-h` are also supported for `--input-dirs`, `--output-package`, `--output-base`, and `--go-header-file`. Use `--trim-path-prefix` to strip a prefix from the output package path when writing files (same as gengo v1).
 
 For example:
 
-`${GOPATH}/bin/kubetype-gen -i istio.io/api/authentication/... -p istio.io/api/kube/apis`
+`${GOPATH}/bin/kubetype-gen --input-dirs istio.io/api/authentication/... --output-package istio.io/api/kube/apis -h vendor/istio.io/tools/cmd/kubetype-gen/boilerplate.go.txt`
 
 The tool can also be used with `go run`, e.g. `go run vendor/istio.io/tools/cmd/kubetype-gen/main.go ...`
 
