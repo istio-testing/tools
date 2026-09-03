@@ -203,14 +203,41 @@ func extractVersions(comments []string) []string {
 }
 
 func getGroupVersion(tags map[string][]string, defaultGV *schema.GroupVersion) (*schema.GroupVersion, error) {
-	if value, exists := tags[groupVersionTagName]; exists && len(value) > 0 {
-		gv, err := schema.ParseGroupVersion(value[0])
+	if values := tagValues(tags, groupVersionTagName); len(values) > 0 {
+		gv, err := schema.ParseGroupVersion(values[0])
 		if err == nil {
 			return &gv, nil
 		}
-		return nil, fmt.Errorf("invalid group version '%s' specified: %v", value[0], err)
+		return nil, fmt.Errorf("invalid group version '%s' specified: %v", values[0], err)
 	}
 	return defaultGV, nil
+}
+
+// tagValues extracts values from gengo/v2 codetag lines. Unlike gengo v1, v2 stores
+// the full tag line after '+' (e.g. "kubetype-gen:groupVersion=extensions.istio.io/v1alpha1")
+// rather than just the value portion.
+func tagValues(tags map[string][]string, tagName string) []string {
+	raw, exists := tags[tagName]
+	if !exists {
+		return nil
+	}
+	values := make([]string, 0, len(raw))
+	prefix := tagName + "="
+	for _, line := range raw {
+		if strings.HasPrefix(line, prefix) {
+			values = append(values, line[len(prefix):])
+			continue
+		}
+		if line == tagName {
+			continue
+		}
+		if idx := strings.Index(line, "="); idx >= 0 {
+			values = append(values, line[idx+1:])
+			continue
+		}
+		values = append(values, line)
+	}
+	return values
 }
 
 func createKubeTypesForType(c *generator.Context, t *types.Type, outputPackage *types.Package) []metadata.KubeType {
@@ -229,16 +256,15 @@ func kubeTypeNamesForType(t *types.Type) []string {
 	comments = append(comments, t.CommentLines...)
 	comments = append(comments, t.SecondClosestCommentLines...)
 	tags := codetags.Extract("+", comments)
-	if value, exists := tags[kubeTypeTagName]; exists {
-		if len(value) == 0 || len(value[0]) == 0 {
+	if values := tagValues(tags, kubeTypeTagName); len(values) > 0 {
+		for _, name := range values {
+			if len(name) > 0 {
+				names = append(names, name)
+			}
+		}
+		if len(names) == 0 {
 			klog.Errorf("Invalid value specified for +%s in type %s.  Using default name %s.", kubeTypeTagName, t, t.Name.Name)
 			names = append(names, t.Name.Name)
-		} else {
-			for _, name := range value {
-				if len(name) > 0 {
-					names = append(names, name)
-				}
-			}
 		}
 	} else {
 		names = append(names, t.Name.Name)
@@ -252,8 +278,5 @@ func getTagsForKubeType(t *types.Type, name string) []string {
 	comments = append(comments, t.CommentLines...)
 	comments = append(comments, t.SecondClosestCommentLines...)
 	tags := codetags.Extract("+", comments)
-	if value, exists := tags[tagName]; exists {
-		return value
-	}
-	return []string{}
+	return tagValues(tags, tagName)
 }
